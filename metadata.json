@@ -1,0 +1,5 @@
+{
+  "name": "Team-Up",
+  "description": "A Progressive Web App (PWA) for managing educational equipment reservations with Baserow integration.",
+  "requestFramePermissions": []
+}
