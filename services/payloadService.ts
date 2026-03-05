@@ -4,8 +4,17 @@ import { Reservation } from '../types';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 const ENDPOINT = `${API_URL}/api/reservations`;
 
-const HEADERS = {
-  'Content-Type': 'application/json'
+// Helper to get Auth Token
+export const getAuthToken = () => {
+  return localStorage.getItem('teamup_payload_token');
+};
+
+const getHeaders = () => {
+  const token = getAuthToken();
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `JWT ${token}` } : {})
+  };
 };
 
 const LOCAL_STORAGE_KEY = 'teamup_reservations_backup';
@@ -29,10 +38,11 @@ export const payloadService = {
   async getReservations(): Promise<Reservation[]> {
     try {
       const response = await fetch(`${ENDPOINT}?limit=200`, {
-        headers: HEADERS
+        headers: getHeaders()
       });
 
       if (!response.ok) {
+        if (response.status === 401) throw new Error("Unauthorized");
         console.warn("Payload API unavailable, switching to Offline Data.");
         return getLocalData();
       }
@@ -44,6 +54,7 @@ export const payloadService = {
       return results;
 
     } catch (error) {
+      if ((error as Error).message === "Unauthorized") throw error;
       console.error("Network error, using Offline Data:", error);
       return getLocalData();
     }
@@ -53,7 +64,7 @@ export const payloadService = {
     try {
       const response = await fetch(ENDPOINT, {
         method: 'POST',
-        headers: HEADERS,
+        headers: getHeaders(),
         body: JSON.stringify(reservation)
       });
 
@@ -77,7 +88,7 @@ export const payloadService = {
     try {
       const response = await fetch(`${ENDPOINT}/${id}`, {
         method: 'PATCH', // Payload uses PATCH for updates too
-        headers: HEADERS,
+        headers: getHeaders(),
         body: JSON.stringify(updates)
       });
       if (!response.ok) throw new Error('Failed to update');
@@ -97,7 +108,7 @@ export const payloadService = {
     try {
       const response = await fetch(`${ENDPOINT}/${id}`, {
         method: 'DELETE',
-        headers: HEADERS
+        headers: getHeaders()
       });
       if (!response.ok) throw new Error('Failed to delete');
 
@@ -141,5 +152,21 @@ export const payloadService = {
     await new Promise(r => setTimeout(r, 400));
     const current = getLocalData();
     setLocalData(current.filter(r => r.id !== id));
+  },
+
+  async login(email: string, password: string): Promise<{ token: string, user: any }> {
+    const res = await fetch(`${API_URL}/api/users/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.errors?.[0]?.message || 'Login failed');
+    localStorage.setItem('teamup_payload_token', data.token);
+    return data;
+  },
+
+  logout() {
+    localStorage.removeItem('teamup_payload_token');
   }
 };

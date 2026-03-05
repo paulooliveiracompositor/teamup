@@ -25,31 +25,34 @@ const Modal = ({ children, onClose }: { children?: React.ReactNode, onClose: () 
 
 const App: React.FC = () => {
   // React Query Hooks
-  const { data: reservations = [], isLoading, isError } = useReservations();
+  const { data, isLoading, isError } = useReservations();
+  const reservations = (data || []) as Reservation[];
   const createMutation = useCreateReservation();
   const deleteMutation = useDeleteReservation();
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem('isAdmin') === 'true');
+  // Use currentUser state to lock the app instead of simple isAdmin
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const { theme, toggleTheme } = useTheme();
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
-  
+
   // Modal States
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  
+
   // Selected reservation details for viewing/cancelling by user (simple view)
   const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
 
   // Initial Checks
   useEffect(() => {
     setNotificationPermission(notificationService.getPermissionState());
-    
-    // Warn if token missing (Demo Mode check)
-    if (BASEROW_API_TOKEN.includes('INSERT_YOUR_BASEROW_TOKEN_HERE')) {
-       addToast('info', 'Modo Demo: Usando armazenamento local (Token da API não configurado).');
+
+    // Check if user is already logged in securely
+    const token = localStorage.getItem('teamup_payload_token');
+    const savedUser = localStorage.getItem('teamup_current_user');
+    if (token && savedUser) {
+      setCurrentUser(JSON.parse(savedUser));
     }
   }, []);
 
@@ -63,7 +66,8 @@ const App: React.FC = () => {
   // Error handling for initial fetch
   useEffect(() => {
     if (isError) {
-      addToast('error', 'Erro ao carregar reservas. Verifique sua conexão.');
+      addToast('error', 'Sua sessão expirou ou houve um erro.');
+      handleLogout(); // Force logout on auth error
     }
   }, [isError]);
 
@@ -79,8 +83,11 @@ const App: React.FC = () => {
   const handleCreateReservation = async (dataList: Partial<Reservation>[]) => {
     try {
       // Loop through multiple equipment selections and create individually
-      await Promise.all(dataList.map(data => createMutation.mutateAsync(data)));
-      
+      await Promise.all(dataList.map(data => createMutation.mutateAsync({
+        ...data,
+        professor_name: currentUser?.name || data.professor_name
+      })));
+
       // Add a small delay so the user can see the "Success" animation on the button inside the modal
       await new Promise(resolve => setTimeout(resolve, 1500));
 
@@ -93,7 +100,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleDeleteReservation = async (id: number) => {
+  const handleDeleteReservation = async (id: number | string) => {
     try {
       await deleteMutation.mutateAsync(id);
       addToast('success', 'Reserva removida.');
@@ -103,17 +110,17 @@ const App: React.FC = () => {
     }
   };
 
-  const handleLogin = () => {
-    setIsAdmin(true);
-    localStorage.setItem('isAdmin', 'true');
-    setIsLoginOpen(false);
-    addToast('success', 'Bem-vindo, Coordenador!');
+  const handleLogin = (user: any) => {
+    setCurrentUser(user);
+    localStorage.setItem('teamup_current_user', JSON.stringify(user));
+    addToast('success', `Bem-vindo(a), ${user.name || user.email}!`);
   };
 
   const handleLogout = () => {
-    setIsAdmin(false);
-    localStorage.removeItem('isAdmin');
-    addToast('info', 'Logout realizado.');
+    setCurrentUser(null);
+    localStorage.removeItem('teamup_current_user');
+    import('./services/payloadService').then(m => m.payloadService.logout());
+    addToast('info', 'Deslogado com sucesso.');
   };
 
   const requestNotifications = async () => {
@@ -131,6 +138,25 @@ const App: React.FC = () => {
 
   const isOperationLoading = createMutation.isPending || deleteMutation.isPending;
 
+  // IF NOT LOGGED IN, RENDER ONLY THE LOGIN SCREEN
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+          <div className="p-6 text-center border-b dark:border-gray-700 bg-gradient-to-r from-primary to-purple-700">
+            <div className="w-16 h-16 mx-auto bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center text-3xl mb-3 shadow-inner">
+              📅
+            </div>
+            <h1 className="text-2xl font-bold text-white tracking-tight leading-none">Team-Up</h1>
+            <p className="text-sm text-blue-100 font-medium mt-1">Reservas de Recursos Didáticos</p>
+          </div>
+          <Login onLogin={handleLogin} />
+        </div>
+        <ToastContainer toasts={toasts} removeToast={removeToast} />
+      </div>
+    );
+  }
+
   return (
     <Router>
       <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-200">
@@ -146,10 +172,10 @@ const App: React.FC = () => {
                 <p className="text-xs text-blue-100 font-medium mt-0.5">Reservas de Recursos Didáticos</p>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-3">
               {/* Notification Bell */}
-              {!isAdmin && notificationPermission !== 'denied' && (
+              {notificationPermission !== 'denied' && (
                 <button
                   onClick={requestNotifications}
                   className={`p-2 rounded-full transition-colors backdrop-blur-sm relative ${notificationPermission === 'granted' ? 'bg-white/20 text-white' : 'bg-white/10 text-white/70 hover:bg-white/20'}`}
@@ -164,7 +190,7 @@ const App: React.FC = () => {
               )}
 
               {/* Help Button */}
-              <button 
+              <button
                 onClick={() => setIsHelpOpen(true)}
                 className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors backdrop-blur-sm text-white"
                 aria-label="Ajuda"
@@ -173,65 +199,57 @@ const App: React.FC = () => {
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               </button>
 
-              <button 
-                onClick={toggleTheme} 
+              <button
+                onClick={toggleTheme}
                 className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors backdrop-blur-sm"
                 aria-label="Toggle Dark Mode"
               >
                 {theme === 'light' ? '🌙' : '☀️'}
               </button>
-              
-              {!isAdmin ? (
-                <button onClick={() => setIsLoginOpen(true)} className="text-sm font-medium hover:text-white/80 transition">
-                  Área Admin
-                </button>
-              ) : (
-                <span className="text-xs bg-accent px-2 py-1 rounded-full font-bold text-white">ADMIN</span>
-              )}
+
+              <button onClick={handleLogout} className="text-sm font-medium bg-white/10 hover:bg-white/20 px-3 py-1 rounded-full transition backdrop-blur-sm text-white">
+                Sair
+              </button>
             </div>
           </div>
         </header>
 
         {/* Main Content */}
         <main className="container mx-auto px-4 py-6 flex-grow">
-           {isAdmin ? (
-             <AdminDashboard reservations={reservations} onDelete={handleDeleteReservation} onLogout={handleLogout} />
-           ) : (
-             <div className="space-y-6">
-                <div className="flex justify-between items-end">
-                   <div>
-                     <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Calendário</h2>
-                     <p className="text-gray-500 dark:text-gray-400 text-sm">
-                       {isOperationLoading ? 'Atualizando...' : 'Gerencie as reservas de equipamentos.'}
-                     </p>
-                   </div>
-                   <button 
-                     onClick={() => {
-                        setSelectedDate(new Date());
-                        setIsFormOpen(true);
-                     }}
-                     className="bg-secondary hover:bg-emerald-500 text-white px-4 py-2 rounded-lg shadow-lg hover:shadow-xl transition transform hover:-translate-y-0.5 flex items-center gap-2 font-medium"
-                   >
-                     <span>+</span> Nova Reserva
-                   </button>
-                </div>
+          <div className="space-y-6">
+            <div className="flex justify-between items-end">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Calendário</h2>
+                <p className="text-gray-500 dark:text-gray-400 text-sm">
+                  {isOperationLoading ? 'Atualizando...' : 'Gerencie as reservas de equipamentos.'}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setSelectedDate(new Date());
+                  setIsFormOpen(true);
+                }}
+                className="bg-secondary hover:bg-emerald-500 text-white px-4 py-2 rounded-lg shadow-lg hover:shadow-xl transition transform hover:-translate-y-0.5 flex items-center gap-2 font-medium"
+              >
+                <span>+</span> Nova Reserva
+              </button>
+            </div>
 
-                {isLoading ? (
-                  <div className="flex justify-center py-20">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-                  </div>
-                ) : (
-                  <CalendarView 
-                    reservations={reservations} 
-                    onSelectDate={(date) => {
-                      setSelectedDate(date);
-                      setIsFormOpen(true);
-                    }}
-                    onSelectReservation={(res) => setSelectedReservation(res)}
-                  />
-                )}
-             </div>
-           )}
+            {isLoading ? (
+              <div className="flex justify-center py-20">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+              </div>
+            ) : (
+              <CalendarView
+                reservations={reservations}
+                onSelectDate={(date) => {
+                  setSelectedDate(date);
+                  setIsFormOpen(true);
+                }}
+                onSelectReservation={(res) => setSelectedReservation(res)}
+              />
+            )}
+          </div>
         </main>
 
         {/* Footer */}
@@ -251,7 +269,7 @@ const App: React.FC = () => {
           <Modal onClose={() => setIsFormOpen(false)}>
             <div className="p-6">
               <h3 className="text-xl font-bold mb-4 text-gray-800 dark:text-white">Nova Reserva</h3>
-              <ReservationForm 
+              <ReservationForm
                 existingReservations={reservations}
                 onSubmit={handleCreateReservation}
                 onCancel={() => setIsFormOpen(false)}
@@ -259,12 +277,6 @@ const App: React.FC = () => {
                 initialDate={selectedDate}
               />
             </div>
-          </Modal>
-        )}
-
-        {isLoginOpen && (
-          <Modal onClose={() => setIsLoginOpen(false)}>
-            <Login onLogin={handleLogin} onCancel={() => setIsLoginOpen(false)} />
           </Modal>
         )}
 
@@ -277,57 +289,57 @@ const App: React.FC = () => {
         {selectedReservation && (
           <Modal onClose={() => setSelectedReservation(null)}>
             <div className="p-6">
-               <div className="flex justify-between items-start mb-4">
-                 <h3 className="text-xl font-bold text-gray-800 dark:text-white">Detalhes da Reserva</h3>
-                 <button onClick={() => setSelectedReservation(null)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">&times;</button>
-               </div>
-               
-               <div className="space-y-3 mb-6 dark:text-gray-200">
-                 <div className="flex justify-between border-b dark:border-gray-700 pb-2">
-                   <span className="text-gray-500 dark:text-gray-400">Equipamento</span>
-                   <span className="font-medium text-primary dark:text-indigo-400">
-                     {typeof selectedReservation.equipment_type === 'object' ? selectedReservation.equipment_type.value : selectedReservation.equipment_type}
-                   </span>
-                 </div>
-                 <div className="flex justify-between border-b dark:border-gray-700 pb-2">
-                   <span className="text-gray-500 dark:text-gray-400">Professor</span>
-                   <span className="font-medium">{selectedReservation.professor_name}</span>
-                 </div>
-                 <div className="flex justify-between border-b dark:border-gray-700 pb-2">
-                   <span className="text-gray-500 dark:text-gray-400">Data</span>
-                   <span className="font-medium">{selectedReservation.date.split('-').reverse().join('/')}</span>
-                 </div>
-                 <div className="flex justify-between border-b dark:border-gray-700 pb-2">
-                   <span className="text-gray-500 dark:text-gray-400">Horário</span>
-                   <span className="font-medium">{selectedReservation.start_time} - {selectedReservation.end_time}</span>
-                 </div>
-                 {selectedReservation.subject && (
-                   <div className="flex justify-between border-b dark:border-gray-700 pb-2">
-                     <span className="text-gray-500 dark:text-gray-400">Disciplina</span>
-                     <span className="font-medium">{selectedReservation.subject}</span>
-                   </div>
-                 )}
-               </div>
+              <div className="flex justify-between items-start mb-4">
+                <h3 className="text-xl font-bold text-gray-800 dark:text-white">Detalhes da Reserva</h3>
+                <button onClick={() => setSelectedReservation(null)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">&times;</button>
+              </div>
 
-               <div className="flex gap-3">
-                 <button 
-                   onClick={() => setSelectedReservation(null)}
-                   className="flex-1 px-4 py-2 border dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-gray-200"
-                 >
-                   Fechar
-                 </button>
-                 <button 
-                    onClick={() => {
-                       if(window.confirm("Para cancelar reservas de outros professores, contate a coordenação. Se esta é sua, confirme.")) {
-                          handleDeleteReservation(selectedReservation.id);
-                       }
-                    }}
-                    className="flex-1 px-4 py-2 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/50 border border-red-100 dark:border-red-800"
-                    disabled={isOperationLoading}
-                 >
-                   {isOperationLoading ? 'Cancelando...' : 'Cancelar Reserva'}
-                 </button>
-               </div>
+              <div className="space-y-3 mb-6 dark:text-gray-200">
+                <div className="flex justify-between border-b dark:border-gray-700 pb-2">
+                  <span className="text-gray-500 dark:text-gray-400">Equipamento</span>
+                  <span className="font-medium text-primary dark:text-indigo-400">
+                    {typeof selectedReservation.equipment_type === 'object' ? selectedReservation.equipment_type.value : selectedReservation.equipment_type}
+                  </span>
+                </div>
+                <div className="flex justify-between border-b dark:border-gray-700 pb-2">
+                  <span className="text-gray-500 dark:text-gray-400">Professor</span>
+                  <span className="font-medium">{selectedReservation.professor_name}</span>
+                </div>
+                <div className="flex justify-between border-b dark:border-gray-700 pb-2">
+                  <span className="text-gray-500 dark:text-gray-400">Data</span>
+                  <span className="font-medium">{selectedReservation.date.split('-').reverse().join('/')}</span>
+                </div>
+                <div className="flex justify-between border-b dark:border-gray-700 pb-2">
+                  <span className="text-gray-500 dark:text-gray-400">Horário</span>
+                  <span className="font-medium">{selectedReservation.start_time} - {selectedReservation.end_time}</span>
+                </div>
+                {selectedReservation.subject && (
+                  <div className="flex justify-between border-b dark:border-gray-700 pb-2">
+                    <span className="text-gray-500 dark:text-gray-400">Disciplina</span>
+                    <span className="font-medium">{selectedReservation.subject}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setSelectedReservation(null)}
+                  className="flex-1 px-4 py-2 border dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-gray-200"
+                >
+                  Fechar
+                </button>
+                <button
+                  onClick={() => {
+                    if (window.confirm("Para cancelar reservas de outros professores, contate a coordenação. Se esta é sua, confirme.")) {
+                      handleDeleteReservation(selectedReservation.id);
+                    }
+                  }}
+                  className="flex-1 px-4 py-2 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/50 border border-red-100 dark:border-red-800"
+                  disabled={isOperationLoading}
+                >
+                  {isOperationLoading ? 'Cancelando...' : 'Cancelar Reserva'}
+                </button>
+              </div>
             </div>
           </Modal>
         )}
