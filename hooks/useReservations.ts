@@ -4,10 +4,11 @@ import { Reservation } from '../types';
 
 export const RESERVATIONS_QUERY_KEY = ['reservations'];
 
-export const useReservations = () => {
+export const useReservations = (user: any) => {
   return useQuery({
     queryKey: RESERVATIONS_QUERY_KEY,
     queryFn: supabaseService.getReservations.bind(supabaseService),
+    enabled: !!user,
   });
 };
 

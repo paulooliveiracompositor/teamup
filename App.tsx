@@ -25,7 +25,8 @@ const Modal = ({ children, onClose }: { children?: React.ReactNode, onClose: () 
 
 const App: React.FC = () => {
   // React Query Hooks
-  const { data, isLoading, isError } = useReservations();
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const { data, isLoading, isError } = useReservations(currentUser);
   const reservations = (data || []) as Reservation[];
   const createMutation = useCreateReservation();
   const deleteMutation = useDeleteReservation();
@@ -33,7 +34,7 @@ const App: React.FC = () => {
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   // Use currentUser state to lock the app instead of simple isAdmin
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isAuthenticating, setIsAuthenticating] = useState(true);
   const { theme, toggleTheme } = useTheme();
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
 
@@ -55,6 +56,7 @@ const App: React.FC = () => {
         setCurrentUser(user);
         localStorage.setItem('teamup_current_user', JSON.stringify(user));
       }
+      setIsAuthenticating(false);
     });
   }, []);
 
@@ -148,6 +150,14 @@ const App: React.FC = () => {
   };
 
   const isOperationLoading = createMutation.isPending || deleteMutation.isPending || updateMutation.isPending;
+
+  if (isAuthenticating) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   // IF NOT LOGGED IN, RENDER ONLY THE LOGIN SCREEN
   if (!currentUser) {
