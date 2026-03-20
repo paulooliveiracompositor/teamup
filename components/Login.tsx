@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { payloadService } from '../services/payloadService';
+import { supabaseService } from '../services/supabaseService';
 
 interface Props {
   onLogin: (user: any) => void;
@@ -17,7 +17,7 @@ const Login: React.FC<Props> = ({ onLogin, onCancel }) => {
     setLoading(true);
     setError('');
     try {
-      const data = await payloadService.login(email, password);
+      const data = await supabaseService.login(email, password);
       onLogin(data.user);
     } catch (err: any) {
       setError(err.message || 'Login falhou. Verifique as credenciais.');

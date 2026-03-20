@@ -1,46 +1,59 @@
-# Team Up - App de Gestão Educacional
+# Team-Up — Migração Payload → Supabase
 
-## 🎯 Objetivo do Projeto
-O **Team Up** é uma aplicação voltada para a gestão e organização de equipes ou grupos em contextos educacionais, facilitando a colaboração e o acompanhamento de atividades.
+## O que mudou
 
-## 🛠️ Stack Tecnológica
-- **Core**: React 19 (Vite)
-- **Linguagem**: TypeScript
-- **Estilização**: Tailwind CSS (UI Pro Max / Glassmorphism)
-- **Gerenciamento de Estado/Dados**: TanStack Query (React Query)
-- **Exportação**: jsPDF & jsPDF-AutoTable
-- **PWA**: Suporte a Progressive Web App (Service Workers & Manifest)
-- **Deployment**: Surge.sh
+O backend foi migrado do **Payload CMS** para o **Supabase**. O frontend React/Vite não mudou visualmente.
 
-## 🚀 Como Rodar Localmente
+Arquivos alterados:
+- `services/supabaseService.ts` — novo (substitui payloadService.ts)
+- `hooks/useReservations.ts` — atualizado
+- `components/Login.tsx` — atualizado
+- `App.tsx` — atualizado
+- `package.json` — adicionado `@supabase/supabase-js`
+- `.env` — variáveis do Supabase
 
-1. **Clone ou Baixe** o projeto.
-2. **Instale as dependências**:
-   ```bash
-   npm install
-   ```
-3. **Configure as Variáveis de Ambiente**:
-   - Crie um arquivo `.env.local` (se não existir).
-   - Adicione sua chave de API: `VITE_GEMINI_API_KEY=sua_chave_aqui` (se aplicável).
-4. **Inicie o servidor de desenvolvimento**:
-   ```bash
-   npm run dev
-   ```
+---
 
-## 🌐 Deployment
-O app está disponível online em:
-**URL**: [https://team-up-edu.surge.sh](https://team-up-edu.surge.sh)
+## Passo 1 — Criar a tabela no Supabase
 
-> *Nota: O domínio original `team-up.surge.sh` já estava ocupado, então o deploy foi realizado em `team-up-edu.surge.sh`.*
+1. Acesse supabase.com → seu projeto
+2. Vá em **SQL Editor**
+3. Cole o conteúdo de `supabase-setup.sql` e clique em **Run**
 
-## 📜 Histórico de Modificações (Changelog)
-- **v1.0.0 (2026-02-12)**: 
-  - Build de produção gerado com Vite.
-  - Implementação de suporte a SPA (200.html) para Surge.
-  - Deploy realizado com sucesso em `team-up-edu.surge.sh`.
-  - Atualização do README com documentação completa.
-- **v1.1.0 (2026-02-12)**:
-  - Adicionado "Auditório" à lista de equipamentos disponíveis.
-  - Atribuição de ícone (🏛️) e cor (Cyan) exclusiva para o Auditório.
-  - Rebuild da aplicação para produção.
+---
 
+## Passo 2 — Criar os usuários (professores)
+
+1. Supabase → **Authentication → Users → Add user → Create new user**
+2. Preencha email e senha de cada professor
+3. Clique no usuário criado e edite `user_metadata`:
+   - Professor: `{ "name": "Nome do Professor", "role": "professor" }`
+   - Admin: `{ "name": "Samila Porto", "role": "admin" }`
+
+---
+
+## Passo 3 — Instalar e rodar localmente
+
+```bash
+npm install
+npm run dev
+```
+
+---
+
+## Passo 4 — Deploy no Vercel
+
+Adicione em Settings → Environment Variables:
+
+| Nome | Valor |
+|------|-------|
+| `VITE_SUPABASE_URL` | `https://vywkdlexzgkpnebcgmnm.supabase.co` |
+| `VITE_SUPABASE_ANON_KEY` | sua anon key completa |
+
+Faça um novo deploy e pronto.
+
+---
+
+## Gerenciar dados
+
+O Supabase tem um **Table Editor** nativo — acesse `supabase.com → Table Editor → reservations` para visualizar, editar e deletar reservas diretamente, sem painel extra.

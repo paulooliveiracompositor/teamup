@@ -10,7 +10,7 @@ import Login from './components/Login';
 import HelpModal from './components/HelpModal';
 import InstallPWA from './components/InstallPWA';
 import { ToastContainer } from './components/ui/Toast';
-import { BASEROW_API_TOKEN } from './constants';
+import { supabaseService } from './services/supabaseService';
 import { useTheme } from './hooks/useTheme';
 
 // Simple Overlay Modal
@@ -48,12 +48,13 @@ const App: React.FC = () => {
   useEffect(() => {
     setNotificationPermission(notificationService.getPermissionState());
 
-    // Check if user is already logged in securely
-    const token = localStorage.getItem('teamup_payload_token');
-    const savedUser = localStorage.getItem('teamup_current_user');
-    if (token && savedUser) {
-      setCurrentUser(JSON.parse(savedUser));
-    }
+    // Restore session from Supabase
+    supabaseService.restoreSession().then(user => {
+      if (user) {
+        setCurrentUser(user);
+        localStorage.setItem('teamup_current_user', JSON.stringify(user));
+      }
+    });
   }, []);
 
   // Check notifications when data loads
@@ -119,7 +120,7 @@ const App: React.FC = () => {
   const handleLogout = () => {
     setCurrentUser(null);
     localStorage.removeItem('teamup_current_user');
-    import('./services/payloadService').then(m => m.payloadService.logout());
+    supabaseService.logout();
     addToast('info', 'Deslogado com sucesso.');
   };
 
