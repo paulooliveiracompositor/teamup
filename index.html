@@ -14,50 +14,6 @@
     <link rel="apple-touch-icon" href="https://ui-avatars.com/api/?name=Team+Up&background=4F46E5&color=fff&size=192&rounded=true&bold=true">
     <link rel="manifest" href="/manifest.json" />
 
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        darkMode: 'class',
-        theme: {
-          extend: {
-            colors: {
-              primary: {
-                DEFAULT: '#4F46E5',
-                dark: '#4338ca',
-              },
-              secondary: '#10B981',
-              accent: '#F59E0B',
-              danger: '#EF4444',
-            },
-            fontFamily: {
-              sans: ['Inter', 'sans-serif'],
-            },
-            animation: {
-              'fade-in': 'fadeIn 0.3s ease-out',
-              'fade-in-up': 'fadeInUp 0.5s ease-out',
-              'scale-in': 'scaleIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-              'bounce-slow': 'bounce 3s infinite',
-            },
-            keyframes: {
-              fadeIn: {
-                '0%': { opacity: '0' },
-                '100%': { opacity: '1' },
-              },
-              fadeInUp: {
-                '0%': { opacity: '0', transform: 'translateY(10px)' },
-                '100%': { opacity: '1', transform: 'translateY(0)' },
-              },
-              scaleIn: {
-                '0%': { opacity: '0', transform: 'scale(0.8)' },
-                '100%': { opacity: '1', transform: 'scale(1)' },
-              }
-            }
-          }
-        }
-      }
-    </script>
-    
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
@@ -87,21 +43,6 @@
         }
       }
     </style>
-  <script type="importmap">
-{
-  "imports": {
-    "date-fns/": "https://esm.sh/date-fns@^4.1.0/",
-    "date-fns": "https://esm.sh/date-fns@^4.1.0",
-    "react/": "https://esm.sh/react@^19.2.4/",
-    "react": "https://esm.sh/react@^19.2.4",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
-    "react-router-dom": "https://esm.sh/react-router-dom@^7.13.0",
-    "@tanstack/react-query": "https://esm.sh/@tanstack/react-query@5.66.0",
-    "jspdf": "https://esm.sh/jspdf@2.5.1",
-    "jspdf-autotable": "https://esm.sh/jspdf-autotable@3.8.2"
-  }
-}
-</script>
 <link rel="stylesheet" href="/index.css">
 </head>
   <body>
