@@ -171,6 +171,35 @@ export const supabaseService = {
     if (!response.ok) throw new Error('Erro ao remover professor');
   },
 
+  // --- DASHBOARD STATS ---
+
+  async getAdminDashboardStats(): Promise<{ usersCount: number; reservationsCount: number; monthlyReservations: any[] }> {
+    const [
+      usersResult,
+      reservationsResult,
+      monthlyResult
+    ] = await Promise.all([
+      supabase.rpc('get_total_users_count'),
+      supabase.rpc('get_total_reservations_count'),
+      supabase.rpc('get_monthly_reservations_count')
+    ]);
+
+    if (usersResult.error || reservationsResult.error || monthlyResult.error) {
+      console.error('Error fetching admin stats:', {
+        usersError: usersResult.error,
+        reservationsError: reservationsResult.error,
+        monthlyError: monthlyResult.error
+      });
+      throw new Error('Falha ao buscar estatísticas do painel de admin.');
+    }
+
+    return {
+      usersCount: usersResult.data,
+      reservationsCount: reservationsResult.data,
+      monthlyReservations: monthlyResult.data
+    };
+  },
+
   // --- MOCK FALLBACKS ---
 
   async mockCreate(reservation: Partial<Reservation>): Promise<Reservation> {

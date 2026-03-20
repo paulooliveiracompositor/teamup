@@ -4,6 +4,7 @@ import { formatDate } from '../utils/dateHelpers';
 import { supabaseService } from '../services/supabaseService';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { AdminChart } from './ui/AdminChart';
 
 interface Props {
   reservations: Reservation[];
@@ -18,11 +19,28 @@ interface GroupedReservation extends Reservation {
 
 type Tab = 'reservations' | 'professors';
 
+const StatCard = ({ title, value, icon }: { title: string; value: string | number; icon: string; }) => (
+  <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+    <div className="flex items-center">
+      <div className="mr-4 text-2xl bg-indigo-100 dark:bg-indigo-900/50 text-primary dark:text-indigo-300 p-2 rounded-lg">{icon}</div>
+      <div>
+        <div className="text-gray-500 dark:text-gray-400 text-sm font-medium">{title}</div>
+        <div className="text-2xl font-bold text-gray-800 dark:text-gray-100">{value}</div>
+      </div>
+    </div>
+  </div>
+);
+
+
 const AdminDashboard: React.FC<Props> = ({ reservations, onDelete, onUpdate, onLogout }) => {
   const [activeTab, setActiveTab] = useState<Tab>('reservations');
   const [searchTerm, setSearchTerm] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+
+  // New state for dashboard-specific stats
+  const [stats, setStats] = useState<{ usersCount: number; reservationsCount: number; monthlyReservations: any[] } | null>(null);
+  const [loadingStats, setLoadingStats] = useState(true);
 
   // Edit reservation state
   const [editingReservation, setEditingReservation] = useState<Reservation | null>(null);
@@ -42,6 +60,15 @@ const AdminDashboard: React.FC<Props> = ({ reservations, onDelete, onUpdate, onL
   useEffect(() => {
     if (activeTab === 'professors') loadProfessors();
   }, [activeTab]);
+
+  // Load dashboard stats on component mount
+  useEffect(() => {
+    setLoadingStats(true);
+    supabaseService.getAdminDashboardStats()
+      .then(data => setStats(data))
+      .catch(err => console.error("Failed to load admin stats", err))
+      .finally(() => setLoadingStats(false));
+  }, []);
 
   const loadProfessors = async () => {
     setLoadingProfessors(true);
@@ -124,6 +151,8 @@ const AdminDashboard: React.FC<Props> = ({ reservations, onDelete, onUpdate, onL
       setNewProf({ name: '', email: '', password: '' });
       setShowAddProfessor(false);
       await loadProfessors();
+      // Refetch stats to update user count
+      supabaseService.getAdminDashboardStats().then(setStats);
     } catch (err: any) {
       setProfError(err.message || 'Erro ao criar professor');
     } finally {
@@ -137,6 +166,8 @@ const AdminDashboard: React.FC<Props> = ({ reservations, onDelete, onUpdate, onL
     try {
       await supabaseService.deleteProfessor(userId);
       await loadProfessors();
+       // Refetch stats to update user count
+      supabaseService.getAdminDashboardStats().then(setStats);
     } finally {
       setDeletingProfId(null);
     }
@@ -184,7 +215,7 @@ const AdminDashboard: React.FC<Props> = ({ reservations, onDelete, onUpdate, onL
       setIsExporting(false);
     }
   };
-
+  
   const popularEquipment = reservations.reduce((acc, curr) => {
     const eq = typeof curr.equipment_type === 'object' ? curr.equipment_type.value : curr.equipment_type;
     acc[eq] = (acc[eq] || 0) + 1;
@@ -192,11 +223,8 @@ const AdminDashboard: React.FC<Props> = ({ reservations, onDelete, onUpdate, onL
   }, {} as Record<string, number>);
 
   const equipmentStats = (Object.entries(popularEquipment) as [string, number][]).sort((a, b) => b[1] - a[1]);
-  const mostUsedEq = equipmentStats[0] || null;
   const maxUsage = equipmentStats[0]?.[1] || 1;
 
-  const getEquipmentMeta = (type: string) =>
-    EQUIPMENT_TYPES.find(e => e.id === type) || { icon: '❓', color: 'bg-gray-100', label: type };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -209,23 +237,25 @@ const AdminDashboard: React.FC<Props> = ({ reservations, onDelete, onUpdate, onL
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="text-gray-500 dark:text-gray-400 text-sm">Total de Reservas</div>
-          <div className="text-3xl font-bold text-primary dark:text-indigo-400">{reservations.length}</div>
-        </div>
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="text-gray-500 dark:text-gray-400 text-sm">Equipamento Mais Usado</div>
-          <div className="text-xl font-bold text-secondary dark:text-emerald-400 truncate">{mostUsedEq ? mostUsedEq[0] : '-'}</div>
-          <div className="text-xs text-gray-400">{mostUsedEq ? `${mostUsedEq[1]} reservas` : ''}</div>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard title="Total de Reservas" value={loadingStats ? '...' : stats?.reservationsCount ?? 0} icon="📅" />
+        <StatCard title="Total de Professores" value={loadingStats ? '...' : stats?.usersCount ?? 0} icon="👩‍🏫" />
         <div onClick={handleExportPDF} className={`bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex items-center justify-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition active:scale-95 ${isExporting ? 'opacity-50 pointer-events-none' : ''}`}>
           <div className="text-center">
             <span className="text-2xl">{isExporting ? '⏳' : '📄'}</span>
             <div className="text-sm font-medium text-gray-600 dark:text-gray-300 mt-1">{isExporting ? 'Gerando...' : 'Exportar PDF'}</div>
           </div>
         </div>
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+           <div className="text-gray-500 dark:text-gray-400 text-sm font-medium">Equipamento Mais Popular</div>
+           <div className="text-xl font-bold text-gray-800 dark:text-gray-100 truncate">{equipmentStats[0]?.[0] || '-'}</div>
+        </div>
       </div>
+      
+      {/* Chart */}
+      {stats && stats.monthlyReservations.length > 0 && (
+        <AdminChart data={stats.monthlyReservations} />
+      )}
 
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-xl w-fit">
