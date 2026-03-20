@@ -12,13 +12,16 @@ const getLocalData = (): Reservation[] => {
   try {
     const data = localStorage.getItem(LOCAL_STORAGE_KEY);
     return data ? JSON.parse(data) : [];
-  } catch {
-    return [];
-  }
+  } catch { return []; }
 };
 
 const setLocalData = (data: Reservation[]) => {
   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
+};
+
+const getAccessToken = async () => {
+  const { data } = await supabase.auth.getSession();
+  return data.session?.access_token;
 };
 
 export const supabaseService = {
@@ -66,9 +69,7 @@ export const supabaseService = {
       .select()
       .single();
 
-    if (error) {
-      return this.mockUpdate(id as number, updates);
-    }
+    if (error) return this.mockUpdate(id as number, updates);
 
     const updatedRes = data as Reservation;
     const current = getLocalData();
@@ -82,9 +83,7 @@ export const supabaseService = {
       .delete()
       .eq('id', id);
 
-    if (error) {
-      return this.mockDelete(id as number);
-    }
+    if (error) return this.mockDelete(id as number);
 
     const current = getLocalData();
     setLocalData(current.filter(r => r.id !== id));
@@ -94,12 +93,10 @@ export const supabaseService = {
 
   async login(email: string, password: string): Promise<{ token: string; user: any }> {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-
     if (error) throw new Error(error.message);
 
     const session = data.session!;
     const user = data.user!;
-
     localStorage.setItem('teamup_supabase_token', session.access_token);
 
     return {
@@ -122,7 +119,6 @@ export const supabaseService = {
   async restoreSession(): Promise<any | null> {
     const { data } = await supabase.auth.getSession();
     if (!data.session) return null;
-
     const user = data.session.user;
     return {
       id: user.id,
@@ -132,7 +128,50 @@ export const supabaseService = {
     };
   },
 
-  // --- MOCK FALLBACKS (Demo / Offline Mode) ---
+  // --- GERENCIAMENTO DE PROFESSORES (apenas admin) ---
+
+  async getProfessors(): Promise<any[]> {
+    const token = await getAccessToken();
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/manage-users`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    if (!response.ok) throw new Error('Erro ao buscar professores');
+    return response.json();
+  },
+
+  async createProfessor(email: string, password: string, name: string): Promise<any> {
+    const token = await getAccessToken();
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/manage-users`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password, name, role: 'professor' }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Erro ao criar professor');
+    return data;
+  },
+
+  async deleteProfessor(userId: string): Promise<void> {
+    const token = await getAccessToken();
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/manage-users`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userId }),
+    });
+    if (!response.ok) throw new Error('Erro ao remover professor');
+  },
+
+  // --- MOCK FALLBACKS ---
 
   async mockCreate(reservation: Partial<Reservation>): Promise<Reservation> {
     await new Promise(r => setTimeout(r, 400));

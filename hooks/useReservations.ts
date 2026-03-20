@@ -33,3 +33,14 @@ export const useDeleteReservation = () => {
     },
   });
 };
+export const useUpdateReservation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, updates }: { id: number | string; updates: Partial<Reservation> }) =>
+      supabaseService.updateReservation(id, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: RESERVATIONS_QUERY_KEY });
+    },
+  });
+};

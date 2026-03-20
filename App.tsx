@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { HashRouter as Router } from 'react-router-dom';
 import { Reservation, ToastMessage } from './types';
 import { notificationService } from './services/notificationService';
-import { useReservations, useCreateReservation, useDeleteReservation } from './hooks/useReservations';
+import { useReservations, useCreateReservation, useDeleteReservation, useUpdateReservation } from './hooks/useReservations';
 import CalendarView from './components/CalendarView';
 import ReservationForm from './components/ReservationForm';
 import AdminDashboard from './components/AdminDashboard';
@@ -29,6 +29,7 @@ const App: React.FC = () => {
   const reservations = (data || []) as Reservation[];
   const createMutation = useCreateReservation();
   const deleteMutation = useDeleteReservation();
+  const updateMutation = useUpdateReservation();
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   // Use currentUser state to lock the app instead of simple isAdmin
@@ -137,7 +138,16 @@ const App: React.FC = () => {
     }
   };
 
-  const isOperationLoading = createMutation.isPending || deleteMutation.isPending;
+  const handleUpdateReservation = async (id: number | string, updates: Partial<Reservation>) => {
+    try {
+      await updateMutation.mutateAsync({ id, updates });
+      addToast('success', 'Reserva atualizada com sucesso!');
+    } catch (error) {
+      addToast('error', 'Erro ao atualizar reserva.');
+    }
+  };
+
+  const isOperationLoading = createMutation.isPending || deleteMutation.isPending || updateMutation.isPending;
 
   // IF NOT LOGGED IN, RENDER ONLY THE LOGIN SCREEN
   if (!currentUser) {
@@ -217,6 +227,14 @@ const App: React.FC = () => {
 
         {/* Main Content */}
         <main className="container mx-auto px-4 py-6 flex-grow">
+          {currentUser?.role === 'admin' ? (
+            <AdminDashboard
+              reservations={reservations}
+              onDelete={handleDeleteReservation}
+              onUpdate={handleUpdateReservation}
+              onLogout={handleLogout}
+            />
+          ) : (
           <div className="space-y-6">
             <div className="flex justify-between items-end">
               <div>
@@ -251,6 +269,7 @@ const App: React.FC = () => {
               />
             )}
           </div>
+          )}
         </main>
 
         {/* Footer */}
