@@ -253,7 +253,7 @@ const AdminDashboard: React.FC<Props> = ({ reservations, onDelete, onUpdate, onL
       </div>
       
       {/* Chart */}
-      {stats && stats.monthlyReservations.length > 0 && (
+      {stats?.monthlyReservations?.length > 0 && (
         <AdminChart data={stats.monthlyReservations} />
       )}
 
