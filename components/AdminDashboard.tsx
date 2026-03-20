@@ -31,6 +31,15 @@ const StatCard = ({ title, value, icon }: { title: string; value: string | numbe
   </div>
 );
 
+const getEquipmentMeta = (type: string) => {
+  return EQUIPMENT_TYPES.find(e => e.id === type || e.label === type) || {
+    id: type,
+    label: type,
+    color: 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700',
+    icon: '📦'
+  };
+};
+
 
 const AdminDashboard: React.FC<Props> = ({ reservations, onDelete, onUpdate, onLogout }) => {
   const [activeTab, setActiveTab] = useState<Tab>('reservations');

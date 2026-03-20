@@ -48,7 +48,7 @@ export const notificationService = {
 
     // 5. Spam prevention: Track notified Reservation IDs instead of just "last checked date"
     // This allows notifying about NEW reservations made for tomorrow, while ignoring ones we already alerted about.
-    const notifiedIds: number[] = JSON.parse(localStorage.getItem('teamup_notified_ids') || '[]');
+    const notifiedIds: (number | string)[] = JSON.parse(localStorage.getItem('teamup_notified_ids') || '[]');
     
     // Filter only those that haven't been notified yet
     const newReservations = myReservations.filter(r => !notifiedIds.includes(r.id));
